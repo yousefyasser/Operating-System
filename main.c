@@ -130,6 +130,17 @@ int main(int argc, char *argv[]) {
   get_policy(policy_str[0], &policy);
   param.sched_priority = strtol(&policy_str[1], NULL, 0);
 
+  if (policy == SCHED_OTHER && param.sched_priority != 0) {
+    usage(argv[0], "For SCHED_OTHER only priority 0 is allowed\n");
+  }
+
+  if (policy == SCHED_RR || policy == SCHED_FIFO) {
+    if (param.sched_priority < sched_get_priority_min(policy) ||
+        param.sched_priority > sched_get_priority_max(policy)) {
+      usage(argv[0], "Priority out of range\n");
+    }
+  }
+
   // Setting the scheduling policy for main thread
   s = pthread_setschedparam(pthread_self(), policy, &param);
   if (s != 0) {
