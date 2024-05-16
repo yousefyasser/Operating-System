@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <semaphore.h>
 
 #define MAX_VARIABLES_PER_PROGRAM 10
 
@@ -16,10 +17,15 @@ struct pcb
 // functions declaration
 int tokenize(char *, char *[]);
 char *readfileContent(char *);
+void writeToNewFile(char *, char *);
 char *get_program_variable(char *);
 void set_program_variable(char *, char *);
+void wait_or_signal_semaphore(char *, int);
 
 char programVariables[MAX_VARIABLES_PER_PROGRAM][2][100];
+
+// semaphores for all available resources
+sem_t userInputSem, userOutputSem, fileSem;
 
 // takes a txt file name and executes its content (program)
 void run_program(const char *fileName)
@@ -40,9 +46,11 @@ void run_program(const char *fileName)
 
         if (strcmp(words[0], "semWait") == 0)
         {
+            wait_or_signal_semaphore(words[1], 1);
         }
         else if (strcmp(words[0], "semSignal") == 0)
         {
+            wait_or_signal_semaphore(words[1], 0);
         }
         else if (strcmp(words[0], "assign") == 0)
         {
@@ -79,6 +87,10 @@ void run_program(const char *fileName)
         }
         else if (strcmp(words[0], "writeFile") == 0)
         {
+            char *subfileName = get_program_variable(words[1]);
+            char *dataToWrite = get_program_variable(words[2]);
+
+            writeToNewFile(subfileName, dataToWrite);
         }
         else
         {
@@ -129,6 +141,19 @@ char *readfileContent(char *subfileName)
     return fileContent;
 }
 
+// writes dataToWrite string into a newly created file with name subfileName
+void writeToNewFile(char *subfileName, char *dataToWrite)
+{
+    FILE *file = fopen(subfileName, "w");
+    if (file == NULL)
+    {
+        printf("Error opening file!\n");
+        return;
+    }
+    fprintf(file, "%s", dataToWrite);
+    fclose(file);
+}
+
 char *get_program_variable(char *variableName)
 {
     for (int i = 0; i < MAX_VARIABLES_PER_PROGRAM; i++)
@@ -162,8 +187,46 @@ void set_program_variable(char *variableName, char *variableValue)
     printf("max variables per program reached");
 }
 
+//      SEMAPHORE FUNCTIONS
+
+void initialize_semaphores()
+{
+    sem_init(&userInputSem, 1, 1);
+    sem_init(&userOutputSem, 1, 1);
+    sem_init(&fileSem, 1, 1);
+}
+
+// wait = 0 means sem_signal the semaphore with semName else sem_wait
+void wait_or_signal_semaphore(char *semName, int wait)
+{
+    if (strcmp(semName, "userInput"))
+    {
+        wait ? sem_wait(&userInputSem) : sem_post(&userInputSem);
+    }
+    else if (strcmp(semName, "userOutput"))
+    {
+        wait ? sem_wait(&userOutputSem) : sem_post(&userOutputSem);
+    }
+    else if (strcmp(semName, "file"))
+    {
+        wait ? sem_wait(&fileSem) : sem_post(&fileSem);
+    }
+    else
+    {
+        printf("Incorrect resource name");
+    }
+}
+
+void destroy_semaphores()
+{
+    sem_destroy(&userInputSem);
+    sem_destroy(&userOutputSem);
+    sem_destroy(&fileSem);
+}
+
 int main()
 {
+    initialize_semaphores();
     int programNum;
     printf("Enter program number (1 / 2 / 3): ");
     scanf("%i", &programNum);
@@ -172,6 +235,7 @@ int main()
     sprintf(programName, "Program_%d.txt", programNum);
 
     run_program(programName);
+    destroy_semaphores();
 
     return 0;
 }
