@@ -15,21 +15,50 @@ int firstFreeMemoryPos = 0;
 
 void create_process(char *, char *);
 void create_pcb(char *);
+char *int_to_string(int);
+char *deep_copy(char *);
 int loadProcessInstructionsToMemory(char *);
 void print_memory();
+char *get_next_instruction(char *);
+int get_index_in_memory(char *, char *);
 
 int main()
 {
-    create_process("1", "Program_1.txt");
-    // print_memory();
-    // printf("-------------------------------------\n");
+    typedef struct
+    {
+        char *priority;
+        char *program;
+        int releaseTime;
+    } process;
 
-    create_process("10", "Program_2.txt");
-    // print_memory();
-    // printf("-------------------------------------\n");
+    // must be in ascending order by release time
+    process p1 = {"1", "Program_1.txt", 0};
+    process p2 = {"10", "Program_2.txt", 3};
+    process p3 = {"20", "Program_3.txt", 5};
+    process processes[] = {p1, p2, p3};
 
-    create_process("20", "Program_3.txt");
-    print_memory();
+    int clockCycle = 0;
+    while (1)
+    {
+        // Check if a new process arrived
+        if (processes[processesCount].releaseTime == clockCycle)
+        {
+            create_process(processes[processesCount].priority, processes[processesCount].program);
+            printf("---------------------------------------------- Clock Cycle %d ----------------------------------------------\n", clockCycle);
+            print_memory();
+        }
+
+        // Scheduler chooses a process to execute
+        char *chosenProcessID = int_to_string(clockCycle % 3);
+
+        // run instruction at pc for the chosen process
+        char *instr = get_next_instruction(chosenProcessID);
+        printf("\n<> %s\n", instr);
+
+        clockCycle++;
+        if (processesCount >= 3)
+            break;
+    }
 
     return 0;
 }
@@ -46,35 +75,38 @@ void create_process(char *priority, char *programName)
     int upperBoundPos = firstFreeMemoryPos - processInstructionCount - 3;
 
     // Adjust memory Upper Bound according to number of instructions
-    char memUpperBound[50];
-    sprintf(memUpperBound, "%d", atoi(memory[upperBoundPos - 1].value) + 3 + processInstructionCount - 1);
-
-    char *valueCopy = malloc(strlen(memUpperBound) + 1);
-    strcpy(valueCopy, memUpperBound);
-
-    memoryElement element = {"memUpperBound", valueCopy};
+    char *memUpperBound = int_to_string(atoi(memory[upperBoundPos - 1].value) + 1 + processInstructionCount);
+    memoryElement element = {"memUpperBound", memUpperBound};
     memory[upperBoundPos] = element;
-
-    processesCount++;
 }
 
 void create_pcb(char *priority)
 {
-    // store first free memory position + 6 (for pcb) as a string in memLowerBound
-    char memLowerBound[50];
-    sprintf(memLowerBound, "%d", firstFreeMemoryPos + 6);
+    // skip first 6 memory elements in the process (pcb) to get first variable position
+    int lowerBound = firstFreeMemoryPos + 6;
 
     char *pcbElementsName[] = {"id", "state", "priority", "pc", "memLowerBound", "memUpperBound"};
-    char *pcbElementsVal[] = {"", "READY", priority, "0", memLowerBound, ""};
+    char *pcbElementsVal[] = {int_to_string(processesCount++), "READY", priority, int_to_string(lowerBound + 3), int_to_string(lowerBound), ""};
 
     for (int i = 0; i < sizeof(pcbElementsName) / sizeof(pcbElementsName[0]); i++)
     {
-        char *valueCopy = malloc(strlen(pcbElementsVal[i]) + 1);
-        strcpy(valueCopy, pcbElementsVal[i]);
-
-        memoryElement element = {pcbElementsName[i], valueCopy};
+        memoryElement element = {pcbElementsName[i], deep_copy(pcbElementsVal[i])};
         memory[firstFreeMemoryPos++] = element;
     }
+}
+
+char *int_to_string(int num)
+{
+    char *str = malloc(sizeof(char) * 50);
+    sprintf(str, "%d", num);
+    return str;
+}
+
+char *deep_copy(char *str)
+{
+    char *copy = malloc(strlen(str) + 1);
+    strcpy(copy, str);
+    return copy;
 }
 
 int loadProcessInstructionsToMemory(char *programName)
@@ -96,13 +128,7 @@ int loadProcessInstructionsToMemory(char *programName)
         char instructionName[50];
         sprintf(instructionName, "Instruction %d", instructionCount++);
 
-        char *nameCopy = malloc(strlen(instructionName) + 1);
-        strcpy(nameCopy, instructionName);
-
-        char *valueCopy = malloc(strlen(line) + 1);
-        strcpy(valueCopy, line);
-
-        memoryElement element = {nameCopy, valueCopy};
+        memoryElement element = {deep_copy(instructionName), deep_copy(line)};
         memory[firstFreeMemoryPos++] = element;
     }
 
@@ -114,16 +140,50 @@ void print_memory()
     int currProcess = 0;
     for (int i = 0; i < MEMORY_SIZE; i++)
     {
-        if (i % 16 == 0)
+        if (memory[i].name && strcmp(memory[i].name, "id") == 0)
         {
             printf("Process %d:\n", currProcess++);
         }
 
         printf("%s: %s\n", memory[i].name, memory[i].value);
 
-        if (i % 16 == 15)
+        if (i + 1 < MEMORY_SIZE && memory[i + 1].name && strcmp(memory[i + 1].name, "id") == 0)
         {
-            printf("\n");
+            printf("\n-------------------------------------\n");
         }
     }
+}
+
+// get index in memory of memory element with name "memElemName" for process with process id "pid"
+int get_index_in_memory(char *memElemName, char *pid)
+{
+    int inProcess = 0;
+    for (int i = 0; i < MEMORY_SIZE; i++)
+    {
+        if (memory[i].name && strcmp(memory[i].name, "id") == 0 && strcmp(memory[i].value, pid) == 0)
+        {
+            inProcess = 1;
+        }
+
+        if (inProcess && memory[i].name && strcmp(memory[i].name, memElemName) == 0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+// fetch next instruction (using the process pc) for process with id: pid, increment its pc
+char *get_next_instruction(char *pid)
+{
+    int idIndex = get_index_in_memory("id", pid);
+
+    int oldPC = atoi(memory[idIndex + 3].value);
+    memory[idIndex + 3].value = int_to_string(oldPC + 1);
+
+    if (idIndex == -1)
+        return "** process not found **";
+
+    return memory[oldPC].value;
 }
