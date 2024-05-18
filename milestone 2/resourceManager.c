@@ -1,104 +1,73 @@
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <semaphore.h>
-
-#define MAX_VARIABLES_PER_PROGRAM 10
-
-struct pcb
-{
-    int processId;
-    char processState[10];
-    int priority;
-    int pc;
-    int memoryBoundaries[2];
-};
+#include "shared.h"
 
 // functions declaration
 int tokenize(char *, char *[]);
 char *readfileContent(char *);
 void writeToNewFile(char *, char *);
-char *get_program_variable(char *);
-void set_program_variable(char *, char *);
 void wait_or_signal_semaphore(char *, int);
-
-char programVariables[MAX_VARIABLES_PER_PROGRAM][2][100];
 
 // semaphores for all available resources
 sem_t userInputSem, userOutputSem, fileSem;
 
-// takes a txt file name and executes its content (program)
-void run_program(const char *fileName)
+// takes an instruction (from program running in process with id pid) as a string and executes it
+void run_instruction(char *instruction, char *pid)
 {
-    FILE *file = fopen(fileName, "r");
-    if (file == NULL)
+    char *words[4];
+    int num_tokens = tokenize(deep_copy(instruction), words);
+
+    if (strcmp(words[0], "semWait") == 0)
     {
-        printf("Failed to open file %s\n", fileName);
-        return;
+        // wait_or_signal_semaphore(words[1], 1);
     }
-
-    char line[256];
-
-    while (fgets(line, sizeof(line), file))
+    else if (strcmp(words[0], "semSignal") == 0)
     {
-        char *words[4];
-        int num_tokens = tokenize(line, words);
-
-        if (strcmp(words[0], "semWait") == 0)
+        // wait_or_signal_semaphore(words[1], 0);
+    }
+    else if (strcmp(words[0], "assign") == 0)
+    {
+        // words[2] is either "input" that takes input from user and put it in variable in words[1]
+        // or words[2] is a readfile instruction followed by words[3] (name of file) and put file content in variable in words[1]
+        if (strcmp(words[2], "readFile") == 0)
         {
-            wait_or_signal_semaphore(words[1], 1);
-        }
-        else if (strcmp(words[0], "semSignal") == 0)
-        {
-            wait_or_signal_semaphore(words[1], 0);
-        }
-        else if (strcmp(words[0], "assign") == 0)
-        {
-            // words[2] is either "input" that takes input from user and put it in variable in words[1]
-            // or words[2] is a readfile instruction followed by words[3] (name of file) and put file content in variable in words[1]
-            if (strcmp(words[2], "readFile") == 0)
-            {
-                char *subfileName = get_program_variable(words[3]);
-                char *fileContent = readfileContent(subfileName);
-                set_program_variable(words[1], fileContent == NULL ? "" : fileContent);
-            }
-            else
-            {
-                char input[100];
-                printf("Please enter a value: ");
-                scanf("%s", input);
-                set_program_variable(words[1], input);
-            }
-        }
-        else if (strcmp(words[0], "print") == 0)
-        {
-            char *val = get_program_variable(words[1]);
-            printf("%s", val);
-        }
-        else if (strcmp(words[0], "printFromTo") == 0)
-        {
-            int from = atoi(get_program_variable(words[1]));
-            int to = atoi(get_program_variable(words[2]));
-
-            for (int i = from; i <= to; i++)
-            {
-                printf("%i ", i);
-            }
-        }
-        else if (strcmp(words[0], "writeFile") == 0)
-        {
-            char *subfileName = get_program_variable(words[1]);
-            char *dataToWrite = get_program_variable(words[2]);
-
-            writeToNewFile(subfileName, dataToWrite);
+            char *subfileName = get_program_variable(pid, words[3]);
+            char *fileContent = readfileContent(subfileName);
+            set_program_variable(pid, words[1], fileContent == NULL ? "" : fileContent);
         }
         else
         {
-            printf("Unsupported Instruction: %s", words[0]);
+            char input[100];
+            printf("Please enter a value: ");
+            scanf("%s", input);
+            set_program_variable(pid, words[1], input);
         }
     }
+    else if (strcmp(words[0], "print") == 0)
+    {
+        char *val = get_program_variable(pid, words[1]);
+        printf("%s", val);
+    }
+    else if (strcmp(words[0], "printFromTo") == 0)
+    {
+        int from = atoi(get_program_variable(pid, words[1]));
+        int to = atoi(get_program_variable(pid, words[2]));
 
-    fclose(file);
+        for (int i = from; i <= to; i++)
+        {
+            printf("%i ", i);
+        }
+    }
+    else if (strcmp(words[0], "writeFile") == 0)
+    {
+        char *subfileName = get_program_variable(pid, words[1]);
+        char *dataToWrite = get_program_variable(pid, words[2]);
+
+        writeToNewFile(subfileName, dataToWrite);
+    }
+    else
+    {
+        printf("Unsupported Instruction: %s\n", words[0]);
+    }
 }
 
 int tokenize(char *line, char *tokens[])
@@ -154,37 +123,54 @@ void writeToNewFile(char *subfileName, char *dataToWrite)
     fclose(file);
 }
 
-char *get_program_variable(char *variableName)
+char *get_program_variable(char *pid, char *variableName)
 {
-    for (int i = 0; i < MAX_VARIABLES_PER_PROGRAM; i++)
+    // first variable position for process pid is stored in its memory lower bound in its pcb
+    int lowerBoundIndex = get_index_in_memory("memLowerBound", pid);
+    int start = atoi(memory[lowerBoundIndex].value);
+
+    for (int i = start; i < start + 3; i++)
     {
-        if (strcmp(programVariables[i][0], variableName) == 0)
+        if (memory[i].name && strcmp(memory[i].name, variableName) == 0)
         {
-            return programVariables[i][1];
+            return memory[i].value;
         }
     }
 
     return "variable not found";
 }
 
-void set_program_variable(char *variableName, char *variableValue)
+void set_program_variable(char *pid, char *variableName, char *variableValue)
 {
-    for (int i = 0; i < MAX_VARIABLES_PER_PROGRAM; i++)
+    // first variable position for process pid is stored in its memory lower bound in its pcb
+    int lowerBoundIndex = get_index_in_memory("memLowerBound", pid);
+    int start = atoi(memory[lowerBoundIndex].value);
+
+    int firstEmptyPos = -1;
+    for (int i = start; i < start + 3; i++)
     {
-        if (strcmp(programVariables[i][0], variableName) == 0)
+        if (memory[i].name != NULL)
         {
-            strcpy(programVariables[i][1], variableValue);
-            return;
+            if (strcmp(memory[i].name, variableName) == 0)
+            {
+                strcpy(memory[i].value, variableValue);
+                return;
+            }
         }
-        else if (strcmp(programVariables[i][0], "\0") == 0)
+        else if (firstEmptyPos == -1)
         {
-            strcpy(programVariables[i][0], variableName);
-            strcpy(programVariables[i][1], variableValue);
-            return;
+            firstEmptyPos = i;
         }
     }
 
-    printf("max variables per program reached");
+    if (firstEmptyPos == -1)
+    {
+        printf("\n!!! NO SPACE FOR NEW VARIABLES FOR PROCESS %s !!!\n", pid);
+        return;
+    }
+
+    memoryElement elem = {deep_copy(variableName), deep_copy(variableValue)};
+    memory[firstEmptyPos] = elem;
 }
 
 //      SEMAPHORE FUNCTIONS
@@ -222,20 +208,4 @@ void destroy_semaphores()
     sem_destroy(&userInputSem);
     sem_destroy(&userOutputSem);
     sem_destroy(&fileSem);
-}
-
-int main()
-{
-    initialize_semaphores();
-    int programNum;
-    printf("Enter program number (1 / 2 / 3): ");
-    scanf("%i", &programNum);
-
-    char programName[50];
-    sprintf(programName, "Program_%d.txt", programNum);
-
-    run_program(programName);
-    destroy_semaphores();
-
-    return 0;
 }
