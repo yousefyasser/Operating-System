@@ -95,16 +95,20 @@ int get_index_in_memory(char *memElemName, char *pid)
     return -1;
 }
 
-// fetch next instruction (using the process pc) for process with id: pid, increment its pc
+// fetch next instruction (using the process pc) for process with id: pid
 char *get_next_instruction(char *pid)
 {
     int idIndex = get_index_in_memory("id", pid);
-
     int oldPC = atoi(memory[idIndex + 3].value);
-    memory[idIndex + 3].value = int_to_string(oldPC + 1);
 
     if (idIndex == -1)
         return "** process not found **";
 
     return memory[oldPC].value;
+}
+
+void change_process_state(char *pid, char *newState)
+{
+    int stateIndex = get_index_in_memory("state", pid);
+    strcpy(memory[stateIndex].value, newState);
 }

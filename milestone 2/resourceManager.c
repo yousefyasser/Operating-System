@@ -5,24 +5,21 @@
 int tokenize(char *, char *[]);
 char *readfileContent(char *);
 void writeToNewFile(char *, char *);
-void wait_or_signal_semaphore(char *, int);
-
-// semaphores for all available resources
-sem_t userInputSem, userOutputSem, fileSem;
+int wait_or_signal_semaphore(char *, int);
 
 // takes an instruction (from program running in process with id pid) as a string and executes it
-void run_instruction(char *instruction, char *pid)
+int run_instruction(char *instruction, char *pid)
 {
     char *words[4];
     int num_tokens = tokenize(deep_copy(instruction), words);
 
     if (strcmp(words[0], "semWait") == 0)
     {
-        // wait_or_signal_semaphore(words[1], 1);
+        return wait_or_signal_semaphore(words[1], 1);
     }
     else if (strcmp(words[0], "semSignal") == 0)
     {
-        // wait_or_signal_semaphore(words[1], 0);
+        return wait_or_signal_semaphore(words[1], 0);
     }
     else if (strcmp(words[0], "assign") == 0)
     {
@@ -68,6 +65,8 @@ void run_instruction(char *instruction, char *pid)
     {
         printf("Unsupported Instruction: %s\n", words[0]);
     }
+
+    return 0;
 }
 
 int tokenize(char *line, char *tokens[])
@@ -177,35 +176,41 @@ void set_program_variable(char *pid, char *variableName, char *variableValue)
 
 void initialize_semaphores()
 {
-    sem_init(&userInputSem, 1, 1);
-    sem_init(&userOutputSem, 1, 1);
-    sem_init(&fileSem, 1, 1);
+    for (int i = 0; i < RESOURCES_SIZE; i++)
+    {
+        sem_init(&resources[i].semaphore, 1, 1);
+        resources[i].blockedQueue = initialize_queue(5);
+    }
 }
 
 // wait = 0 means sem_signal the semaphore with semName else sem_wait
-void wait_or_signal_semaphore(char *semName, int wait)
+int wait_or_signal_semaphore(char *semName, int wait)
 {
-    if (strcmp(semName, "userInput"))
+    char *semNames[] = {"userInput", "userOutput", "file"};
+
+    for (int i = 0; i < RESOURCES_SIZE; i++)
     {
-        wait ? sem_wait(&userInputSem) : sem_post(&userInputSem);
+        if (strcmp(semName, semNames[i]) == 0)
+        {
+            if (wait)
+            {
+                return sem_trywait(&resources[i].semaphore) * -(i + 1);
+            }
+            else
+            {
+                sem_post(&resources[i].semaphore);
+                return (-(i + 1));
+            }
+        }
     }
-    else if (strcmp(semName, "userOutput"))
-    {
-        wait ? sem_wait(&userOutputSem) : sem_post(&userOutputSem);
-    }
-    else if (strcmp(semName, "file"))
-    {
-        wait ? sem_wait(&fileSem) : sem_post(&fileSem);
-    }
-    else
-    {
-        printf("Incorrect resource name");
-    }
+
+    return 0;
 }
 
 void destroy_semaphores()
 {
-    sem_destroy(&userInputSem);
-    sem_destroy(&userOutputSem);
-    sem_destroy(&fileSem);
+    for (int i = 0; i < RESOURCES_SIZE; i++)
+    {
+        sem_destroy(&resources[i].semaphore);
+    }
 }
