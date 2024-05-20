@@ -42,7 +42,7 @@ int run_instruction(char *instruction, char *pid)
     else if (strcmp(words[0], "print") == 0)
     {
         char *val = get_program_variable(pid, words[1]);
-        printf("%s", val);
+        printf("%s\n", val);
     }
     else if (strcmp(words[0], "printFromTo") == 0)
     {
@@ -176,10 +176,12 @@ void set_program_variable(char *pid, char *variableName, char *variableValue)
 
 void initialize_semaphores()
 {
+    char *semNames[] = {"userInput", "userOutput", "file"};
+
     for (int i = 0; i < RESOURCES_SIZE; i++)
     {
         sem_init(&resources[i].semaphore, 1, 1);
-        resources[i].blockedQueue = initialize_queue(5);
+        resources[i].blockedQueue = initialize_queue(semNames[i], 5);
     }
 }
 

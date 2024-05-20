@@ -1,11 +1,11 @@
 #include "shared.h"
 
-void create_pcb(char *);
+void create_pcb();
 int loadProcessInstructionsToMemory(char *);
 
-void create_process(char *priority, char *programName)
+void create_process(char *programName)
 {
-    create_pcb(priority);
+    create_pcb();
 
     // leave 3 empty memory elements after pcb to store process variables
     firstFreeMemoryPos += 3;
@@ -20,13 +20,13 @@ void create_process(char *priority, char *programName)
     memory[upperBoundPos] = element;
 }
 
-void create_pcb(char *priority)
+void create_pcb()
 {
-    // skip first 6 memory elements in the process (pcb) to get first variable position
-    int lowerBound = firstFreeMemoryPos + 6;
+    // skip first 5 memory elements in the process (pcb) to get first variable position
+    int lowerBound = firstFreeMemoryPos + 5;
 
-    char *pcbElementsName[] = {"id", "state", "priority", "pc", "memLowerBound", "memUpperBound"};
-    char *pcbElementsVal[] = {int_to_string(processesCount++), "READY", priority, int_to_string(lowerBound + 3), int_to_string(lowerBound), ""};
+    char *pcbElementsName[] = {"id", "state", "pc", "memLowerBound", "memUpperBound"};
+    char *pcbElementsVal[] = {int_to_string(processesCount++), "READY", int_to_string(lowerBound + 3), int_to_string(lowerBound), ""};
 
     for (int i = 0; i < sizeof(pcbElementsName) / sizeof(pcbElementsName[0]); i++)
     {
@@ -99,7 +99,7 @@ int get_index_in_memory(char *memElemName, char *pid)
 char *get_next_instruction(char *pid)
 {
     int idIndex = get_index_in_memory("id", pid);
-    int oldPC = atoi(memory[idIndex + 3].value);
+    int oldPC = atoi(memory[idIndex + 2].value);
 
     if (idIndex == -1)
         return "** process not found **";

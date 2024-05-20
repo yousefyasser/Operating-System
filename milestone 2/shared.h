@@ -11,15 +11,15 @@
 
 typedef struct
 {
-    char *priority;
     char *program;
-    int releaseTime;
+    int pid, releaseTime, quantum;
 } process;
 
 typedef struct
 {
+    char *name;
     process *data;
-    int capacity, size;
+    int capacity, size, front, rear;
 } queue;
 
 typedef struct
@@ -41,7 +41,7 @@ extern int processesCount;
 extern resource resources[];
 
 // function declarations (defined in ProcessCreation.c)
-void create_process(char *priority, char *programName);
+void create_process(char *programName);
 char *int_to_string(int num);
 char *deep_copy(char *str);
 int get_index_in_memory(char *memElemName, char *pid);
@@ -56,9 +56,12 @@ void initialize_semaphores();
 void destroy_semaphores();
 
 // function declarations (defined in priorityQueue.c)
-queue *initialize_queue(int cap);
+queue *initialize_queue(char *name, int cap);
+int is_empty(queue *q);
 void enqueue(queue *q, process new_process);
 process dequeue(queue *q);
+void remove_process(queue *q, int pid);
+process peek(queue *q);
 void print_queue(queue *q);
 
 #endif
