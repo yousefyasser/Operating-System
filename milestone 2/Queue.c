@@ -101,13 +101,14 @@ process peek(queue *q)
 
 void print_queue(queue *q)
 {
+    printf("%s: ", q->name);
     if (is_empty(q))
     {
-        printf("Queue is empty\n");
+        printf("Queue is empty\n\n");
         return;
     }
 
-    printf("%s:\n", q->name);
+    printf("\n");
     int count = q->size;
     int i = q->front;
     while (count > 0)
@@ -116,5 +117,5 @@ void print_queue(queue *q)
         i = (i + 1) % q->capacity;
         count--;
     }
-    printf("\n\n");
+    printf("\n");
 }

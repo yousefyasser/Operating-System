@@ -12,5 +12,5 @@ https://docs.google.com/document/d/1CEQ_GfQ3AWDeaZaWLFKrwmf8eHq1TsfIpYiQt3h58UE/
 ### milestone 2
 
 - cd milestone\ 2
-- gcc -o finalProgram main.c ProcessCreation.c resourceManager.c shared.c priorityQueue.c
+- gcc -o finalProgram main.c ProcessCreation.c resourceManager.c shared.c Queue.c
 - ./finalProgram

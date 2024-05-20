@@ -31,8 +31,6 @@ int main()
     while (1)
     {
         printf("---------------------------------------------- Clock Cycle %d ----------------------------------------------\n", clockCycle);
-        print_memory();
-        printf("\n");
 
         // Check if a new process arrived
         if (processes[processesCount].releaseTime == clockCycle)
@@ -67,13 +65,15 @@ int main()
 
         printf("Process currently running: %s\n\n", chosenProcessID);
 
-        printf("Queues after process blocking event:\n");
-        print_all_queues(generalBlockedQueue, readyQueue);
-
         // run instruction at pc for the chosen process
         change_process_state(chosenProcessID, "RUNNING");
         char *instr = get_next_instruction(chosenProcessID);
         printf("<> Instruction currently executing: %s\n", instr);
+
+        printf("\n**************************************************************\n");
+        printf("Queues after process scheduling event:\n");
+        print_all_queues(generalBlockedQueue, readyQueue);
+        printf("\n**************************************************************\n");
 
         int blocked = 0;
         if (strcmp(instr, "** process not found **"))
@@ -94,6 +94,7 @@ int main()
                 process p = dequeue(resources[abs(blocked) - 1].blockedQueue);
                 remove_process(generalBlockedQueue, p.pid);
                 enqueue(readyQueue, p);
+                change_process_state(int_to_string(p.pid), "READY");
             }
         }
         else // sem wait put process in blocked queue (general and resource) and remove from ready queue
@@ -102,8 +103,10 @@ int main()
             enqueue(generalBlockedQueue, processes[atoi(chosenProcessID)]);
             remove_process(readyQueue, atoi(chosenProcessID));
 
+            printf("\n**************************************************************\n");
             printf("Queues after process blocking event:\n");
             print_all_queues(generalBlockedQueue, readyQueue);
+            printf("\n**************************************************************\n");
         }
 
         int pcIndex = get_index_in_memory("pc", chosenProcessID);
@@ -115,34 +118,23 @@ int main()
             dequeue(readyQueue);
             processFinished = 1;
 
+            printf("\n**************************************************************\n");
             printf("Queues after process finished:\n");
             print_all_queues(generalBlockedQueue, readyQueue);
+            printf("\n**************************************************************\n");
         }
 
         quantumRem--;
         clockCycle++;
 
-        // int finishedCount = 0;
-        // for (int i = 0; i < processesCount; i++)
-        // {
-        //     int stateIndex = get_index_in_memory("state", int_to_string(processes[i].pid));
-        //     printf("%d\n", stateIndex);
-        //     if (strcmp(memory[stateIndex].value, "FINISHED") == 0)
-        //     {
-        //         finishedCount++;
-        //     }
-        // }
-
-        // if (processesCount >= 3)
-        // if (finishedCount == processesCount)
         if (is_empty(readyQueue) && processesCount >= PROCESSES_COUNT)
         {
             break;
         }
-    }
 
-    printf("---------------------------------------------- Clock Cycle %d ----------------------------------------------\n", clockCycle);
-    print_memory();
+        print_memory();
+        printf("\n");
+    }
 
     destroy_semaphores();
 
